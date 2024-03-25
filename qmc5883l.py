@@ -20,10 +20,11 @@ import math
 import struct
 from mag_base import mag_base
 
+
 class QMC5883L(mag_base):
     # probe the existence of const()
     try:
-        _canary = const(0xfeed)
+        _canary = const(0xFEED)
     except:
         const = lambda x: x
 
@@ -77,7 +78,7 @@ class QMC5883L(mag_base):
     CONFIG2_SOFT_RST = const(0b10000000)
 
     def __init__(self, i2c, offset=50.0):
-        super().__init__(i2c) # super().__init__(self, i2c)
+        super().__init__(i2c)  # super().__init__(self, i2c)
 
         self.temp_offset = offset
         self.oversampling = QMC5883L.CONFIG_OS64
@@ -95,19 +96,20 @@ class QMC5883L(mag_base):
         self.reconfig()
 
     def reconfig(self):
-        self.command[0] = (self.oversampling | self.range |
-                           self.rate | self.mode)
-        self.i2c.writeto_mem(QMC5883L.ADDR, QMC5883L.CONFIG,
-                             self.command)
+        self.command[0] = self.oversampling | self.range | self.rate | self.mode
+        self.i2c.writeto_mem(QMC5883L.ADDR, QMC5883L.CONFIG, self.command)
         sleep(0.01)
         self.command[0] = QMC5883L.CONFIG2_INT_DISABLE
-        self.i2c.writeto_mem(QMC5883L.ADDR, QMC5883L.CONFIG2,
-                             self.command)
+        self.i2c.writeto_mem(QMC5883L.ADDR, QMC5883L.CONFIG2, self.command)
         sleep(0.01)
 
     def set_oversampling(self, sampling):
-        if (sampling << 6) in (QMC5883L.CONFIG_OS512, QMC5883L.CONFIG_OS256,
-                               QMC5883L.CONFIG_OS128, QMC5883L.CONFIG_OS64):
+        if (sampling << 6) in (
+            QMC5883L.CONFIG_OS512,
+            QMC5883L.CONFIG_OS256,
+            QMC5883L.CONFIG_OS128,
+            QMC5883L.CONFIG_OS64,
+        ):
             self.oversampling = sampling << 6
             self.reconfig()
         else:
@@ -121,8 +123,12 @@ class QMC5883L(mag_base):
             raise ValueError("Invalid parameter")
 
     def set_sampling_rate(self, rate):
-        if (rate << 2) in (QMC5883L.CONFIG_10HZ, QMC5883L.CONFIG_50HZ,
-                           QMC5883L.CONFIG_100HZ, QMC5883L.CONFIG_200HZ):
+        if (rate << 2) in (
+            QMC5883L.CONFIG_10HZ,
+            QMC5883L.CONFIG_50HZ,
+            QMC5883L.CONFIG_100HZ,
+            QMC5883L.CONFIG_200HZ,
+        ):
             self.rate = rate << 2
             self.reconfig()
         else:
@@ -143,13 +149,12 @@ class QMC5883L(mag_base):
         try:
             while not self.ready():
                 sleep(0.005)
-            self.i2c.readfrom_mem_into(QMC5883L.ADDR, QMC5883L.X_LSB,
-                                       self.register)
+            self.i2c.readfrom_mem_into(QMC5883L.ADDR, QMC5883L.X_LSB, self.register)
         except OSError as error:
             print("OSError", error)
             pass  # just silently re-use the old values
         # Convert the axis values to signed Short before returning
-        x, y, z, _, temp = struct.unpack('<hhhBh', self.register)
+        x, y, z, _, temp = struct.unpack("<hhhBh", self.register)
 
         return (x, y, z, temp)
 
@@ -157,40 +162,36 @@ class QMC5883L(mag_base):
         x, y, z, temp = self.read_raw()
         scale = 12000 if self.range == QMC5883L.CONFIG_2GAUSS else 3000
 
-        return (x / scale, y / scale, z / scale,
-                (temp / 100 + self.temp_offset))
+        return (x / scale, y / scale, z / scale, (temp / 100 + self.temp_offset))
 
     def calibrate(self, seconds):
         start = ticks_ms()
-        Xmin=1000
-        Xmax=-1000
-        Ymin=1000
-        Ymax=-1000
-        while ticks_diff(ticks_ms(), start) < 1000*seconds:
+        Xmin = 1000
+        Xmax = -1000
+        Ymin = 1000
+        Ymax = -1000
+        while ticks_diff(ticks_ms(), start) < 1000 * seconds:
             x, y, z, _ = self.read_scaled()
-            Xmin=min(x,Xmin)
-            Xmax=max(x,Xmax)
-            Ymin=min(y,Ymin)
-            Ymax=max(y,Ymax)
+            Xmin = min(x, Xmin)
+            Xmax = max(x, Xmax)
+            Ymin = min(y, Ymin)
+            Ymax = max(y, Ymax)
             sleep(0.01)
         self.xs = 1
-        self.ys = (Xmax-Xmin)/(Ymax-Ymin)
-        self.xb = self.xs*(1/2*(Xmax-Xmin)-Xmax)
-        self.yb = self.xs*(1/2*(Ymax-Ymin)-Ymax)
+        self.ys = (Xmax - Xmin) / (Ymax - Ymin)
+        self.xb = self.xs * (1 / 2 * (Xmax - Xmin) - Xmax)
+        self.yb = self.xs * (1 / 2 * (Ymax - Ymin) - Ymax)
         self.has_calibrated = True
 
     def read_calib(self):
         if not self.has_calibrated:
-            raise ValueError("have not calibrated yet!")
-        xs= self.xs
-        xb= self.xb
-        ys= self.ys
-        yb= self.yb
+            raise ValueError("has not calibrated yet!")
+        xs = self.xs
+        xb = self.xb
+        ys = self.ys
+        yb = self.yb
         x, y, z, _ = self.read_scaled()
         return (x * xs + xb, y * ys + yb, z)
 
     def get_angle(self, x, y):
-        if x == 0:
-            x += 0.0001
-        return math.atan(y/x) * (180/math.pi)
-
+        return math.degrees(math.atan2(y, x))
