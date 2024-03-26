@@ -28,13 +28,12 @@ drv.stop_a()
 drv.stop_b()
 
 print("finished calibrating!")
-# print("calibration params: ", qmc.xs, qmc.xb, qmc.ys, qmc.yb)
+print("calibration params: ", qmc.xs, qmc.xb, qmc.ys, qmc.yb)
 
 drv.throttle_a(0.8)
 drv.throttle_b(-0.8)
-for _ in range(1000000):
+for _ in range(100):
     x, y, z, t = qmc.read_scaled()
-    # print(x, y, z, qmc.get_angle(x, y))
     angle = qmc.get_angle(x, y)
     print(angle)
 
